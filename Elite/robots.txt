@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+
+Sitemap: https://www.heathroweliteparking.co.uk/sitemap.xml

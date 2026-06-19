@@ -1,0 +1,174 @@
+.blog-operation {
+  min-height: 100vh;
+  background: #f8f9fb;
+  padding: 60px 0;
+}
+
+/* HEADER */
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.top-bar h2 {
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* BUTTONS */
+.create-btn {
+  background: #005c25;
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.logout-btn {
+  background: white;
+  border: 1px solid green;
+  color: green;
+  padding: 10px 18px;
+  border-radius: 6px;
+}
+
+/* TABLE */
+.table-wrapper {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+}
+
+.action-icons {
+  display: flex;
+  gap: 8px;
+}
+
+/* ICON BUTTON BASE */
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 35px;
+  height: 35px;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* COLORS */
+.view-btn {
+  color: #28a745;
+}
+
+.edit-btn {
+  border: 1px solid #0d6efd;
+  color: #0d6efd;
+}
+
+.delete-btn {
+  border: 1px solid red;
+  color: red;
+}
+
+/* HOVER */
+.view-btn:hover {
+  background: #28a745;
+  color: white;
+}
+
+.edit-btn:hover {
+  background: #0d6efd;
+  color: white;
+}
+
+.delete-btn:hover {
+  background: red;
+  color: white;
+}
+
+.blog-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.blog-table th {
+  text-align: left;
+  padding: 12px;
+  border-bottom: 2px solid #eee;
+}
+
+.blog-table td {
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+  vertical-align: middle;
+}
+
+/* STATUS */
+.status-badge {
+  background: #198754;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+/* IMAGE */
+.blog-img {
+  width: 50px;
+  height: 50px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+/* ACTION BUTTONS */
+.view-btn {
+  border: 1px solid #28a745;
+  color: #28a745;
+  background: transparent;
+  padding: 5px 10px;
+  margin-right: 5px;
+  border-radius: 5px;
+}
+
+.edit-btn {
+  border: 1px solid #005c25;
+  color: #005c25;
+  background: transparent;
+  padding: 5px 10px;
+  margin-right: 5px;
+  border-radius: 5px;
+}
+
+.delete-btn {
+  border: 1px solid green;
+  color: green;
+  background: transparent;
+  padding: 5px 10px;
+  border-radius: 5px;
+}
+
+/* HOVER EFFECT */
+.view-btn:hover {
+  background: #28a745;
+  color: white;
+}
+
+.edit-btn:hover {
+  background: #005c25;
+  color: white;
+}
+
+.delete-btn:hover {
+  background: green;
+  color: white;
+}
