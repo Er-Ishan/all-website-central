@@ -41,9 +41,10 @@ const Terms = () => {
               <h4>1. BOOKINGS & CONFIRMATION</h4>
 
               <p><strong>1.1</strong> A booking is confirmed only once full payment is received and a booking reference is issued.</p>
-              <p><strong>1.2</strong> Bookings are valid only for the vehicle, terminal, date and
-                time specified.</p>
+              <p><strong>1.2</strong> Bookings are valid only for the vehicle, terminal, date and time specified.</p>
               <p><strong>1.3</strong> Bookings are non-transferable unless agreed in writing.</p>
+              <p><strong>1.3</strong> Customers are responsible for providing accurate information.</p>
+              <p><strong>1.4</strong>  Scot Park Ltd accepts no liability for delays caused by traffic, airport operations, weather, security alerts, or circumstances beyond our control.</p>
             </div>
 
             {/* =======================
@@ -53,9 +54,9 @@ const Terms = () => {
               <h4>2. PAYMENT TERMS</h4>
 
               <p><strong>2.1</strong> Full payment must be made before service commencement.</p>
-              <p><strong>2.2</strong> Extensions of stay will incur additional daily charges.</p>
-              <p><strong>2.3</strong> Additional late-return charges may apply if collection
-                exceeds booked times.</p>
+              <p><strong>2.2</strong>  Extensions of stay will incur additional daily charges.</p>
+              <p><strong>2.3</strong> Additional late-return charges may apply if collection exceeds booked times.</p>
+              <p><strong>2.4</strong> AdditVehicles uncollected after 30 days may be treated as abandoned in accordance with UK law.</p>
             </div>
 
             {/* =======================
@@ -64,10 +65,10 @@ const Terms = () => {
             <div className="policy-block">
               <h4>3. CANCELLATIONS & AMENDMENTS</h4>
 
-              <p><strong>3.1</strong> Cancellations made more than 24 hours prior may incur an
-                administration fee.</p>
+              <p><strong>3.1</strong> Cancellations made more than 24 hours prior may incur an administration fee.</p>
               <p><strong>3.2</strong> No refunds within 24 hours of service start time.</p>
               <p><strong>3.3</strong> Amendments within 24 hours may incur charges.</p>
+              <p><strong>3.4</strong> Early returns are non-refundable.</p>
             </div>
 
             {/* =======================
@@ -77,8 +78,10 @@ const Terms = () => {
               <h4>4. VEHICLE CONDITION & CUSTOMER RESPONSIBILITIES</h4>
 
               <p><strong>4.1</strong> Vehicles must be roadworthy, insured, taxed and compliant with UK law.</p>
-              <p><strong>4.1</strong> Customers must remove all valuables.</p>
-              <p><strong>4.1</strong> Scot Park Ltd is not responsible for mechanical failures not caused by negligence.</p>
+              <p><strong>4.2</strong> Customers must remove all valuables.</p>
+              <p><strong>4.3</strong> Scot Park Ltd is not responsible for mechanical failures not caused by negligence.</p>
+              <p><strong>4.4</strong> Pre-existing damage must be declared at handover.</p>
+              <p><strong>4.5</strong> Only documented damage reported before departure from collection point will be considered.</p>
             </div>
 
             {/* =======================
@@ -88,8 +91,10 @@ const Terms = () => {
               <h4>5. LIABILITY & INSURANCE</h4>
 
               <p><strong>5.1</strong> Scot Park Ltd maintains motor trade insurance covering staff while operating vehicles.</p>
-              <p><strong>5.1</strong> Liability is limited to damage caused by proven negligence.</p>
-              <p><strong>5.1</strong> Maximum liability per claim is £50,000 unless otherwise required by law.</p>
+              <p><strong>5.2</strong> Liability is limited to damage caused by proven negligence.</p>
+              <p><strong>5.3</strong> Maximum liability per claim is £50,000 unless otherwise required by law.</p>
+              <p><strong>5.4</strong> Scot Park Ltd is not liable for theft, fire, flood, weather damage, acts of nature or indirect losses such as
+missed flights.</p>
             </div>
 
             {/* =======================
@@ -98,9 +103,10 @@ const Terms = () => {
             <div className="policy-block">
               <h4>6. EXCLUSIONS & LIMITATIONS</h4>
 
-              <p>No responsibility is accepted for valuables left in vehicles.</p>
-              <p>Minor scratches, stone chips or wear consistent with normal road use are excluded.</p>
-              <p>Interior condition is not inspected unless agreed.</p>
+              <p><strong>6.1</strong> No responsibility is accepted for valuables left in vehicles.</p>
+              <p><strong>6.2</strong> Minor scratches, stone chips or wear consistent with normal road use are excluded.</p>
+              <p><strong>6.3</strong>  Interior condition is not inspected unless agreed.</p>
+              <p><strong>6.4</strong> Claims below £750 may not be processed.</p>
             </div>
 
             {/* =======================
@@ -109,20 +115,28 @@ const Terms = () => {
             <div className="policy-block">
               <h4>7. OPERATIONAL RIGHTS</h4>
 
-              <p>Scot Park Ltd shall not be liable for failure to perform
-                obligations due to events beyond reasonable control including
-                natural disasters, government restrictions, airport closures,
-                strikes or security incidents..</p>
+              <p><strong>7.1</strong> Scot Park Ltd reserves the right to move vehicles for operational reasons.</p>
+              <p><strong>7.2</strong> Vehicles may be relocated between secure compounds if required.</p>
+              <p><strong>7.3</strong>  Service may be refused where customer behaviour is abusive or unsafe.</p>
             </div>
 
             {/* =======================
-                SECTION 6
+                SECTION 7
             ======================== */}
             <div className="policy-block">
-              <h4>8. GOVERNING LAW</h4>
+              <h4>8. FORCE MAJEURE</h4>
 
-              <p>These Terms & Conditions are governed by the laws of
-                England & Wales and subject to UK jurisdiction.</p>
+              <p>Scot Park Ltd shall not be liable for failure to perform obligations due to events beyond reasonable control
+including natural disasters, government restrictions, airport closures, strikes or security incidents.</p>
+            </div>
+
+            {/* =======================
+                SECTION 8
+            ======================== */}
+            <div className="policy-block">
+              <h4>9. GOVERNING LAW</h4>
+
+              <p>These Terms & Conditions are governed by the laws of England & Wales and subject to UK jurisdiction.</p>
             </div>
 
           </div>
