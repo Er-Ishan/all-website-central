@@ -12,6 +12,7 @@ import NavbarElement from "../component/NavbarElement";
 import Footer from "../component/Footer";
 import Copyright from "../component/Copyright";
 import Topbar from "./Topbar";
+import { apiFetch } from "../services/parkingApi";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -41,7 +42,7 @@ const RetryPaymentPage = () => {
 
     // 1️⃣ Fetch booking
     useEffect(() => {
-        fetch(`${API}/api/booking/${bookingId}`)
+        apiFetch(`${API}/api/booking/${bookingId}`)
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
@@ -84,7 +85,7 @@ const RetryPaymentPage = () => {
     useEffect(() => {
         if (!bookingData || isExpired) return;
 
-        fetch(`${API}/api/stripe/create-payment-intent`, {
+        apiFetch(`${API}/api/stripe/create-payment-intent`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -185,7 +186,7 @@ const RetryPaymentPage = () => {
             payment_validity_minutes: 60,
         };
 
-        const resp = await fetch(`${API}/api/create-booking-after-payment`, {
+        const resp = await apiFetch(`${API}/api/create-booking-after-payment`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),

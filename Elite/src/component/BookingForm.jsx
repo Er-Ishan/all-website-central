@@ -6,8 +6,9 @@ import Copyright from './Copyright'
 import { useLocation, useNavigate } from "react-router-dom";
 import "./booking.css";
 import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-
+import { apiFetch } from "../services/parkingApi";
 const API = import.meta.env.VITE_API_URL;
+const COMPANY_NAME = import.meta.env.VITE_COMPANY_NAME || "Elite Parking";
 
 
 
@@ -49,7 +50,7 @@ const BookingForm = () => {
 
 
     useEffect(() => {
-        fetch(`${API}/api/cancellation/charges`)
+        apiFetch(`${API}/api/cancellation/charges`)
             .then(res => res.json())
             .then(data => {
                 if (data.success && data.data.length > 0) {
@@ -62,7 +63,7 @@ const BookingForm = () => {
     }, []);
 
     useEffect(() => {
-        fetch(`${API}/api/booking-fees`)
+        apiFetch(`${API}/api/booking-fees`)
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
@@ -80,7 +81,7 @@ const BookingForm = () => {
     const fetchDepartTerminals = async (airport_id) => {
         if (!airport_id) return;
 
-        const res = await fetch(
+        const res = await apiFetch(
             `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/data/terminals-by-airport/${airport_id}`
         );
 
@@ -156,7 +157,7 @@ const BookingForm = () => {
     // Fetch product info
     useEffect(() => {
         if (productId) {
-            fetch(`${API}/api/parking-product/${productId}`)
+            apiFetch(`${API}/api/parking-product/${productId}`)
                 .then(res => res.json())
                 .then(data => setProduct(data.data))
                 .catch(err => console.error(err));
@@ -197,7 +198,7 @@ const BookingForm = () => {
 
         const fetchTerminals = async () => {
             try {
-                const res = await fetch(
+                const res = await apiFetch(
                     `${API}/api/data/terminals-by-product/${productId}`
                 );
                 const data = await res.json();
@@ -304,13 +305,13 @@ const BookingForm = () => {
             total_payable: totalPayable,
             status: "Pending",
             source: "Website",
-            website_name: "Gregg Maurice Parking",
+            website_name: COMPANY_NAME,
             transaction_source: "Online",
             transaction_id: null
         };
 
         try {
-            const res = await fetch(`${API}/api/create-booking`, {
+            const res = await apiFetch(`${API}/api/create-booking`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),

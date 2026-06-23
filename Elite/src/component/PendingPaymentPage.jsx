@@ -10,7 +10,7 @@ import Topbar from "../component/Topbar";
 import NavbarElement from "../component/NavbarElement";
 import Footer from "../component/Footer";
 import Copyright from "../component/Copyright";
-
+import { apiFetch } from "../services/parkingApi";
 const API = import.meta.env.VITE_API_URL;
 
 const PendingPaymentPage = () => {
@@ -25,7 +25,7 @@ const PendingPaymentPage = () => {
 
     // 🔹 Fetch booking by ID
     useEffect(() => {
-        fetch(`${API}/api/booking/${bookingId}`, {
+        apiFetch(`${API}/api/booking/${bookingId}`, {
             credentials: "include"
         })
             .then(res => res.json())
@@ -47,7 +47,7 @@ const PendingPaymentPage = () => {
     useEffect(() => {
         if (!booking) return;
 
-        fetch(`${API}/api/stripe/create-payment-intent`, {
+        apiFetch(`${API}/api/stripe/create-payment-intent`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

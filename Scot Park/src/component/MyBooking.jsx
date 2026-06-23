@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { apiFetch } from "../services/parkingApi";
 import Topbar from "../component/Topbar";
 import NavbarElement from "../component/NavbarElement";
 import Footer from "../component/Footer";
@@ -125,7 +126,7 @@ export default function MyBooking() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        fetch(`${API}/api/my-bookings`, {
+        apiFetch(`${API}/api/my-bookings`, {
             credentials: "include"
         })
             .then((res) => {
@@ -229,7 +230,7 @@ export default function MyBooking() {
                                 style={{ background: "#3A1672" }}
                                 className="btn w-100 text-white"
                                 onClick={async () => {
-                                    await fetch(`${API}/api/logout`, {
+                                    await apiFetch(`${API}/api/logout`, {
                                         method: "POST",
                                         credentials: "include"
                                     });

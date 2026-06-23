@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import "./style.css";
+import { apiFetch } from "../services/parkingApi";
 import { SlCalender, SlClock, SlPlane } from "react-icons/sl";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { FaArrowLeft } from "react-icons/fa";
-
 import heroImage from "../assets/banner5.jpeg";
-
-
 import formImage from "../assets/form-bg.jpg";
 
 const API = import.meta.env.VITE_API_URL;
@@ -107,22 +105,27 @@ export default function Hero() {
 
 
     const [airportList, setAirportList] = useState([]);
+    const [airport, setAirport] = useState(
+        localStorage.getItem("selectedAirport") || ""
+    );
 
-
-    useEffect(() => {
-        fetch(`${API}/api/data/airports`)
+     useEffect(() => {
+        apiFetch(`${API}/api/data/airports`)
             .then((res) => res.json())
             .then((data) => {
-                // 🔐 SAFETY: ensure array
-                if (Array.isArray(data)) {
-                    setAirportList(data);
-                } else if (Array.isArray(data.data)) {
-                    setAirportList(data.data);
-                } else if (Array.isArray(data.airports)) {
-                    setAirportList(data.airports);
-                } else {
-                    console.error("Unexpected airport API response:", data);
-                    setAirportList([]); // prevent crash
+                let list = [];
+                if (Array.isArray(data)) list = data;
+                else if (Array.isArray(data.data)) list = data.data;
+                else if (Array.isArray(data.airports)) list = data.airports;
+                else console.error("Unexpected airport API response:", data);
+
+                setAirportList(list);
+
+                // default to first airport if nothing stored yet
+                if (!localStorage.getItem("selectedAirport") && list.length > 0) {
+                    const first = list[0].airport_name;
+                    setAirport(first);
+                    localStorage.setItem("selectedAirport", first);
                 }
             })
             .catch((err) => {
@@ -132,13 +135,13 @@ export default function Hero() {
     }, []);
 
 
-    const [airport, setAirport] = useState("Heathrow");
+    
 
 
 
     // time defaults
-    const [dropTime, setDropTime] = useState("04:00");
-    const [returnTime, setReturnTime] = useState("04:00");
+    const [dropTime, setDropTime] = useState("00:00");
+    const [returnTime, setReturnTime] = useState("00:00");
 
     const navigate = useNavigate();
 
@@ -627,15 +630,23 @@ export default function Hero() {
                                                                 Airport
                                                             </label>
 
-                                                            <select
-                                                                className="form-select form-select-lg"
-                                                                value={airport}
-                                                                onChange={(e) => setAirport(e.target.value)}
-                                                                disabled
-                                                            >
-                                                                <option value="Heathrow">Heathrow</option>
-                                                                {/* <option value="Gatwick">Gatwick</option> */}
-                                                            </select>
+                                                           <select
+                                                                    className="form-select form-select-lg"
+                                                                    value={airport}
+                                                                    onChange={(e) => {
+                                                                        setAirport(e.target.value);
+                                                                        localStorage.setItem("selectedAirport", e.target.value);
+                                                                    }}
+                                                                >
+                                                                    {airportList.length === 0 && (
+                                                                        <option value="">Loading airports...</option>
+                                                                    )}
+                                                                    {airportList.map((a) => (
+                                                                        <option key={a.airport_id} value={a.airport_name}>
+                                                                            {a.airport_name}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
 
                                                         </div>
 

@@ -1,6 +1,4 @@
 import { Routes, Route } from "react-router-dom";
-import { Elements } from "@stripe/react-stripe-js";
-import { loadStripe } from "@stripe/stripe-js";
 import Home from "./pages/Home";
 import About from "./pages/About";
 import ProductData from "./pages/ProductData";
@@ -34,8 +32,6 @@ import Privacy from "./component/Privacy";
 import NewReviews from "./component/NewReviews";
 import GlasgowParkking from "./component/GlasgowParkking";
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
-
 function App() {
   return (
     <>
@@ -49,37 +45,16 @@ function App() {
         <Route path="/termsandconditions" element={<Terms />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/booking-form" element={<BookingForm />} />
-        <Route
-          path="/payment"
-          element={
-            <Elements stripe={stripePromise}>
-              <PaymentPage />
-            </Elements>
-          }
-        />
+        <Route path="/payment" element={<PaymentPage />} />
         <Route path="/thank-you" element={<ThankYouPage />} />
         <Route path="/receipt" element={<ReceiptPage />} />
         <Route path="/product-details/:id" element={<ProductDetailsModal />} />
         <Route path="/my-booking/:id" element={<MyBooking />} />
-        <Route
-          path="/pending-payment/:bookingId"
-          element={
-            <Elements stripe={stripePromise}>
-              <PendingPaymentPage />
-            </Elements>
-          }
-        />
+        <Route path="/pending-payment/:bookingId" element={<PendingPaymentPage />} />
         <Route path="/booking-details" element={<BookingDetailsPage />} />
         <Route path="/booking-data-information" element={<MyBookingsData />} />
         <Route path="/my-booking-form" element={<MyBookingForm />} />
-        <Route
-          path="/retry-payment/:bookingId"
-          element={
-            <Elements stripe={stripePromise}>
-              <RetryPaymentPage />
-            </Elements>
-          }
-        />
+        <Route path="/retry-payment/:bookingId" element={<RetryPaymentPage />} />
 
         <Route path="/how-work/details" element={<HowWorkLatest />} />
         <Route path="/meetgreet" element={<MeetGreet />} />

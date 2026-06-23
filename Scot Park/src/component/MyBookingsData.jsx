@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { apiFetch } from "../services/parkingApi";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -69,7 +70,7 @@ export default function MyBookingsData({ onSuccess }) {
                                 return;
                             }
 
-                            const res = await fetch(`${API}/api/search-booking`, {
+                            const res = await apiFetch(`${API}/api/search-booking`, {
                                 method: "POST",
                                 credentials: "include",
                                 headers: { "Content-Type": "application/json" },

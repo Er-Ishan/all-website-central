@@ -4,6 +4,7 @@ import Topbar from "../component/Topbar";
 import NavbarElement from "../component/NavbarElement";
 import Footer from "../component/Footer";
 import Copyright from "../component/Copyright";
+import { apiFetch } from "../services/parkingApi";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -29,7 +30,7 @@ export default function MyBookingForm() {
         try {
             setLoading(true);
 
-            const res = await fetch(`${API}/api/search-booking`, {
+            const res = await apiFetch(`${API}/api/search-booking`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

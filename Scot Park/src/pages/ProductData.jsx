@@ -32,6 +32,7 @@ function addDaysToDateString(dateStr, days) {
 
 
 import NavbarElement from '../component/NavbarElement';
+import { apiFetch } from '../services/parkingApi';
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -157,7 +158,7 @@ const ProductData = () => {
         }
 
         try {
-            const res = await fetch(`${API}/api/promocode/${encodeURIComponent(normalized)}`);
+            const res = await apiFetch(`${API}/api/promocode/${encodeURIComponent(normalized)}`);
             const data = await res.json();
 
             if (data.success) {
@@ -217,16 +218,30 @@ const ProductData = () => {
 
 
     useEffect(() => {
-        fetch(`${API}/api/data/airports`)
+        apiFetch(`${API}/api/data/airports`)
             .then((res) => res.json())
             .then((data) => {
-                setAirportList(data);
+                let list = [];
+                if (Array.isArray(data)) list = data;
+                else if (Array.isArray(data.airports)) list = data.airports;
+                else if (Array.isArray(data.data)) list = data.data;
 
-                // auto-select first airport if none selected
-                if (!localStorage.getItem("selectedAirport") && data.length > 0) {
-                    setSelectedAirport(data[0].airport_name);
-                    localStorage.setItem("selectedAirport", data[0].airport_name);
+                setAirportList(list);
+                if (!list.length) return;
+
+                const stored = localStorage.getItem("selectedAirport");
+                const validNames = list.map((a) => a.airport_name);
+                // use stored airport only if it's still valid for this company
+                const airport = (stored && validNames.includes(stored))
+                    ? stored
+                    : list[0].airport_name;
+
+                if (airport !== stored) {
+                    localStorage.setItem("selectedAirport", airport);
                 }
+                setSelectedAirport(airport);
+                setAppliedAirport(airport);
+                fetchAllProducts(airport);
             })
             .catch((err) => console.error("Failed to load airports", err));
     }, []);
@@ -245,7 +260,7 @@ const ProductData = () => {
 
     const handleMoreInfo = async (id) => {
         try {
-            const res = await fetch(`${API}/api/parking-product/${id}`);
+            const res = await apiFetch(`${API}/api/parking-product/${id}`);
             const result = await res.json();
 
             if (result.success) {
@@ -262,7 +277,7 @@ const ProductData = () => {
         if (!dropDateState || !returnDateState) return;
 
         setPricing({});
-        fetchAllProducts();
+        fetchAllProducts();  // will read airport from localStorage
     };
 
     const closeModal = () => {
@@ -281,23 +296,12 @@ const ProductData = () => {
         });
     };
 
-    // Fetch All Products Initially
-    useEffect(() => {
-        const init = async () => {
-            if (promoCode) {
-                const ok = await validatePromoCode(promoCode);
-                if (!ok) return;
-            }
-            fetchAllProducts();
-        };
-
-        init();
-    }, []);
+    // Products are fetched by the airport useEffect after it validates/sets the airport
 
 
     const fetchDynamicPrice = async (product_id, dropDate, returnDate) => {
         try {
-            const res = await fetch(`${API}/api/calculate-price`, {
+            const res = await apiFetch(`${API}/api/calculate-price`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -320,11 +324,21 @@ const ProductData = () => {
         }
     };
 
-    const fetchAllProducts = async () => {
+    const fetchAllProducts = async (airportOverride) => {
         try {
-            setLoading(true); // ✅ START
+            setLoading(true);
 
-            const res = await fetch(`${API}/api/parking-product`);
+            const airport = airportOverride || localStorage.getItem("selectedAirport") || appliedAirport;
+            const dropDate = localStorage.getItem("dropDate") || dropDateState;
+            const returnDate = localStorage.getItem("returnDate") || returnDateState;
+
+            if (!airport) { setLoading(false); return; }
+
+            const res = await apiFetch(`${API}/api/parking-product`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ dropDate, returnDate, airport }),
+            });
             const data = await res.json();
 
             let list = [];

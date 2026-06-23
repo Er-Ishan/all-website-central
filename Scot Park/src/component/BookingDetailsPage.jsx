@@ -1,16 +1,20 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import html2pdf from "html2pdf.js";
-import Topbar from "./Topbar";
 import NavbarElement from "../component/NavbarElement";
 import Footer from "../component/Footer";
 import Copyright from "../component/Copyright";
 import logo from "../../public/img/scotpark_logo_dark.png";
+import {fetchCompanyInfo, saveReceiptPdfToDb, sendBookingEmail } from "../services/parkingApi";
 
-const API = import.meta.env.VITE_API_URL;
+
 
 const BookingDetailsPage = () => {
     const location = useLocation();
+    const [emailStatus, setEmailStatus] = useState("idle"); // idle | sending | success | error
+    const [emailMessage, setEmailMessage] = useState("");
+    const [isEmailing, setIsEmailing] = useState(false);
+    const [company, setCompany] = useState(null);
     const [sending, setSending] = React.useState(false);
     const bookingData = location.state?.bookingData || null;
     const addons = bookingData?.addons || {};
@@ -27,9 +31,18 @@ const BookingDetailsPage = () => {
         });
     };
 
-
-
+const refPrefix = company?.ref_prefix ?? "E";
+const ref = String(bookingData.booking_id).padStart(8, "0");
+const companyName = company?.name ?? "";
     const currentTransactionDate = formatDate(new Date());
+
+    const handleEmailBookingDetails = async () => {
+        setEmailStatus("sending");
+        setEmailMessage("");
+        const result = await sendBookingEmail(bookingData.booking_id);
+        setEmailStatus(result.ok ? "success" : "error");
+        setEmailMessage(result.message);
+    };
 
     /* ==========================
         DOWNLOAD PDF
@@ -69,15 +82,7 @@ const BookingDetailsPage = () => {
     const saveReceiptToDB = async () => {
         try {
             const pdfBase64 = await generatePDFBase64();
-
-            await fetch(`${API}/api/save-receipt-pdf`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    booking_id: bookingData.booking_id,
-                    receipt_pdf: pdfBase64,
-                }),
-            });
+            await saveReceiptPdfToDb(bookingData.booking_id, pdfBase64);
         } catch (err) {
             console.error("Receipt save failed", err);
         }
@@ -132,9 +137,12 @@ const BookingDetailsPage = () => {
                             textAlign: "right",
                         }}
                     >
-                        <h3 style={{ marginBottom: "6px" }}>BOOKING DETAILS</h3>
+                        <h3 style={{ marginBottom: "6px", color: "#0A1A3A" }}>BOOKING DETAILS</h3>
                         <p style={{ fontSize: "12px" }}>
                             Date: {currentTransactionDate}
+                        </p>
+                        <p style={{ fontSize: "12px", fontWeight: "bold" }}>
+                             Ref: {refPrefix}-{ref}
                         </p>
                     </div>
                 </div>
@@ -145,7 +153,7 @@ const BookingDetailsPage = () => {
 
                     <table width="100%" border="1" cellPadding="6" style={{ borderCollapse: "collapse", fontSize: "13px" }}>
                         <tbody>
-                            <tr style={{ background: "#eee", fontWeight: "bold" }}>
+                            <tr style={{ background: "#0A1A3A", color: "#fff", fontWeight: "bold" }}>
                                 <td colSpan="5">CUSTOMER DETAILS</td>
                             </tr>
                             <tr style={{ fontWeight: "bold" }}>
@@ -172,7 +180,7 @@ const BookingDetailsPage = () => {
 
                     <table width="100%" border="1" cellPadding="6" style={{ borderCollapse: "collapse", fontSize: "13px" }}>
                         <tbody>
-                            <tr style={{ background: "#eee", fontWeight: "bold" }}>
+                            <tr style={{ background: "#0A1A3A", color: "#fff", fontWeight: "bold" }}>
                                 <td colSpan="5">VEHICLE DETAILS</td>
                             </tr>
                             <tr style={{ fontWeight: "bold" }}>
@@ -199,7 +207,7 @@ const BookingDetailsPage = () => {
                     {/* PAYMENT SUMMARY */}
                     <table width="100%" border="1" cellPadding="6" style={{ borderCollapse: "collapse", fontSize: "13px" }}>
                         <tbody>
-                            <tr style={{ background: "#eee", fontWeight: "bold" }}>
+                            <tr style={{ background: "#0A1A3A", color: "#fff", fontWeight: "bold" }}>
                                 <td colSpan="2">FLIGHT DETAILS</td>
                             </tr>
                             <tr>
@@ -229,7 +237,7 @@ const BookingDetailsPage = () => {
                     {/* PAYMENT SUMMARY */}
                     <table width="100%" border="1" cellPadding="6" style={{ borderCollapse: "collapse", fontSize: "13px" }}>
                         <tbody>
-                            <tr style={{ background: "#eee", fontWeight: "bold" }}>
+                            <tr style={{ background: "#0A1A3A", color: "#fff", fontWeight: "bold" }}>
                                 <td colSpan="2">BOOKING DETAILS</td>
                             </tr>
 
@@ -270,7 +278,7 @@ const BookingDetailsPage = () => {
                 {/* <div style={{ overflowX: "auto", marginTop: "20px" }}>
                     <table width="100%" border="1" cellPadding="6" style={{ borderCollapse: "collapse", fontSize: "13px" }}>
                         <tbody>
-                            <tr style={{ background: "#eee", fontWeight: "bold" }}>
+                            <tr style={{ background: "#0A1A3A", color: "#fff", fontWeight: "bold" }}>
                                 <td colSpan="2">PAYMENT SUMMARY</td>
                             </tr>
                             <tr>
@@ -321,18 +329,16 @@ const BookingDetailsPage = () => {
                 </p>
             </div>
 
-            {/* DOWNLOAD BUTTON */}
             {/* ACTION BUTTONS */}
             <div
                 style={{
-                    textAlign: "center",
-                    marginBottom: "40px",
                     display: "flex",
                     justifyContent: "center",
                     gap: "20px",
+                    margin: "30px 0",
+                    flexWrap: "wrap",
                 }}
             >
-                {/* Download PDF */}
                 <button
                     onClick={downloadPDF}
                     style={{
@@ -345,47 +351,38 @@ const BookingDetailsPage = () => {
                         cursor: "pointer",
                     }}
                 >
+                    <i className="fa-solid fa-download me-2"></i>
                     Download Booking PDF
                 </button>
 
-                {/* Email PDF */}
-                {/* <button
-                    onClick={async () => {
-                        setSending(true);
-                        try {
-                            const pdfBase64 = await generatePDFBase64();
-                            const res = await fetch(`${API}/api/email-booking`, {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                    booking_id: bookingData.booking_id,
-                                    email: bookingData.email,
-                                    first_name: bookingData.first_name,
-                                    receipt_pdf: pdfBase64,
-                                }),
-                            });
-                            const data = await res.json();
-                            if (res.ok) alert("Email sent successfully!");
-                            else alert("Email failed: " + data.message);
-                        } catch (err) {
-                            console.error(err);
-                            alert("Something went wrong while emailing the receipt");
-                        }
-                        setSending(false);
-                    }}
+                <button
+                    onClick={handleEmailBookingDetails}
+                    disabled={emailStatus === "sending" || emailStatus === "success"}
                     style={{
-                        background: "#28a745",
+                        background: "#ffa200",
                         color: "#fff",
                         padding: "12px 34px",
                         borderRadius: "30px",
                         border: "none",
                         fontWeight: "bold",
-                        cursor: "pointer",
+                        cursor: emailStatus === "sending" ? "wait" : emailStatus === "success" ? "default" : "pointer",
+                        opacity: emailStatus === "success" ? 0.75 : 1,
                     }}
                 >
-                    {sending ? "Sending..." : "Email Booking PDF"}
-                </button> */}
+                    {emailStatus === "sending" ? (
+                        <><i className="fa-solid fa-spinner fa-spin me-2"></i>Sending…</>
+                    ) : emailStatus === "success" ? (
+                        <><i className="fa-solid fa-check me-2"></i>Details Sent</>
+                    ) : (
+                        <><i className="fa-solid fa-envelope me-2"></i>Email Booking Details</>
+                    )}
+                </button>
             </div>
+            {emailMessage && (
+                <p className={`text-center mt-2 ${emailStatus === "success" ? "text-success" : "text-danger"}`} style={{ fontSize: "13px" }}>
+                    {emailMessage}
+                </p>
+            )}
 
 
             <Footer />

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { apiFetch } from "../services/parkingApi";
 import "./style.css";
 import { SlCalender, SlPlane } from "react-icons/sl";
 import { SlShield, SlClock, SlCheck } from "react-icons/sl";
@@ -104,22 +105,27 @@ export default function Hero() {
 
 
     const [airportList, setAirportList] = useState([]);
-
+    const [airport, setAirport] = useState(
+        localStorage.getItem("selectedAirport") || ""
+    );
 
     useEffect(() => {
-        fetch(`${API}/api/data/airports`)
+        apiFetch(`${API}/api/data/airports`)
             .then((res) => res.json())
             .then((data) => {
-                // 🔐 SAFETY: ensure array
-                if (Array.isArray(data)) {
-                    setAirportList(data);
-                } else if (Array.isArray(data.data)) {
-                    setAirportList(data.data);
-                } else if (Array.isArray(data.airports)) {
-                    setAirportList(data.airports);
-                } else {
-                    console.error("Unexpected airport API response:", data);
-                    setAirportList([]); // prevent crash
+                let list = [];
+                if (Array.isArray(data)) list = data;
+                else if (Array.isArray(data.data)) list = data.data;
+                else if (Array.isArray(data.airports)) list = data.airports;
+                else console.error("Unexpected airport API response:", data);
+
+                setAirportList(list);
+
+                // default to first airport if nothing stored yet
+                if (!localStorage.getItem("selectedAirport") && list.length > 0) {
+                    const first = list[0].airport_name;
+                    setAirport(first);
+                    localStorage.setItem("selectedAirport", first);
                 }
             })
             .catch((err) => {
@@ -127,9 +133,6 @@ export default function Hero() {
                 setAirportList([]);
             });
     }, []);
-
-
-    const [airport, setAirport] = useState("Glasgow");
 
 
 
@@ -585,10 +588,19 @@ export default function Hero() {
                                                                 <select
                                                                     className="form-select form-select-lg"
                                                                     value={airport}
-                                                                    onChange={(e) => setAirport(e.target.value)}
-                                                                    disabled
+                                                                    onChange={(e) => {
+                                                                        setAirport(e.target.value);
+                                                                        localStorage.setItem("selectedAirport", e.target.value);
+                                                                    }}
                                                                 >
-                                                                    <option value="Glasgow">Glasgow</option>
+                                                                    {airportList.length === 0 && (
+                                                                        <option value="">Loading airports...</option>
+                                                                    )}
+                                                                    {airportList.map((a) => (
+                                                                        <option key={a.airport_id} value={a.airport_name}>
+                                                                            {a.airport_name}
+                                                                        </option>
+                                                                    ))}
                                                                 </select>
 
                                                             </div>

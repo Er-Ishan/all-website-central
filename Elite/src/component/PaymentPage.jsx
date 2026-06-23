@@ -8,7 +8,7 @@ import Footer from "../component/Footer";
 import Copyright from "../component/Copyright";
 import NavbarElement from "../component/NavbarElement";
 import Topbar from "./Topbar";
-
+import { apiFetch } from "../services/parkingApi";
 const API = import.meta.env.VITE_API_URL;
 
 const PaymentPage = () => {
@@ -40,7 +40,7 @@ const PaymentPage = () => {
         if (timeLeft <= 0) {
             (async () => {
                 try {
-                    await fetch(`${API}/api/stripe/payment-session-expired`, {
+                    await apiFetch(`${API}/api/stripe/payment-session-expired`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
@@ -79,12 +79,13 @@ const PaymentPage = () => {
         if (!bookingData) return;
 
         (async () => {
-            const resp = await fetch(`${API}/api/stripe/create-payment-intent`, {
+            const resp = await apiFetch(`${API}/api/stripe/create-payment-intent`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     amount: Math.round(Number(bookingData.total_payable) * 100),
                     payment_intent_id: bookingData.payment_intent_id || null,
+                    booking_id: bookingData.booking_id,
                 }),
             });
 
@@ -200,7 +201,7 @@ const PaymentPage = () => {
                 status: "Paid",
             };
 
-            const resp = await fetch(`${API}/api/create-booking-after-payment`, {
+            const resp = await apiFetch(`${API}/api/create-booking-after-payment`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
@@ -212,7 +213,7 @@ const PaymentPage = () => {
                     state: {
                         bookingData: {
                             ...payload,
-                            booking_id: result.booking_id,
+                            booking_id: result.ref_no,
                         },
                     },
                 });
@@ -232,7 +233,7 @@ const PaymentPage = () => {
             status: "Paid",
         };
 
-        const resp = await fetch(`${API}/api/create-booking-after-payment`, {
+        const resp = await apiFetch(`${API}/api/create-booking-after-payment`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),

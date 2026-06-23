@@ -6,6 +6,7 @@ import Footer from "../component/Footer";
 import Copyright from "../component/Copyright";
 import NavbarElement from "../component/NavbarElement";
 import Topbar from "./Topbar";
+import { saveReceiptPdfToDb, fetchCompanyInfo, sendBookingEmail } from "../services/parkingApi";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -15,9 +16,15 @@ const ReceiptPage = () => {
   const bookingData = location.state?.bookingData || null;
   const addons = bookingData?.addons || {};
   const addonsTotal = bookingData?.addons_total || 0;
+  const [companyInfo, setCompanyInfo] = useState(null);
   const [isEmailing, setIsEmailing] = React.useState(false);
-
+  const [emailStatus, setEmailStatus] = useState("idle"); // idle | sending | success | error
+  const [emailMessage, setEmailMessage] = useState("");
   const receiptRef = useRef();
+
+  useEffect(() => {
+    fetchCompanyInfo().then(info => { if (info) setCompanyInfo(info); });
+  }, []);
 
   const formatDate = (dateInput) => {
     const date = new Date(dateInput);
@@ -30,19 +37,9 @@ const ReceiptPage = () => {
     });
   };
 
-  const getAirportContactNumber = (airport) => {
-    const a = String(airport || "").toLowerCase();
-
-    if (a.includes("heathrow")) {
-      return "07426151798"; // Heathrow number
-    }
-
-    if (a.includes("gatwick")) {
-      return "07754647575"; // Gatwick number (change if different)
-    }
-
-    return "012 345 67890"; // fallback
-  };
+ const contactPhone = companyInfo?.support_contact_no || companyInfo?.mobile_no || "";
+  const contactEmail = companyInfo?.support_email_address || "";
+  const ref = String(bookingData.booking_id).padStart(8, "0");
 
 
   const currentTransactionDate = formatDate(new Date());
@@ -61,88 +58,46 @@ const ReceiptPage = () => {
     html2pdf().set(options).from(element).save();
   };
 
-
-  const emailPDF = async () => {
-    try {
-      setIsEmailing(true); // start loading
-
-      const pdfBase64 = await generatePDFBase64();
-
-      const res = await fetch(`${API}/api/email-receipt-pdf`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          booking_id: bookingData.booking_id,
-          email: bookingData.email,
-          first_name: bookingData.first_name,
-          receipt_pdf: pdfBase64
-        })
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        alert("Receipt emailed successfully!");
-      } else {
-        alert("Failed to email receipt");
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Something went wrong while emailing receipt");
-    } finally {
-      setIsEmailing(false); // stop loading
-    }
+const handleEmailReceipt = async () => {
+    setEmailStatus("sending");
+    setEmailMessage("");
+    const result = await sendBookingEmail(bookingData.booking_id);
+    setEmailStatus(result.ok ? "success" : "error");
+    setEmailMessage(result.message);
   };
-
-
 
   const generatePDFBase64 = async () => {
-    const element = receiptRef.current;
-
-    const options = {
-      margin: 0.3,
+  const pdf = await html2pdf()
+    .set({
+      margin: 0.4,
       image: { type: "jpeg", quality: 1 },
       html2canvas: { scale: 2 },
-      jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
-    };
+      jsPDF: {
+        unit: "in",
+        format: "a4",
+        orientation: "portrait",
+      },
+    })
+    .from(receiptRef.current)
+    .outputPdf("datauristring");
 
-    const pdf = await html2pdf()
-      .set(options)
-      .from(element)
-      .outputPdf("datauristring");
+  return pdf.split(",")[1];
+};
 
-    return pdf.split(",")[1]; // remove data prefix
-  };
-
-  const saveReceiptToDB = async () => {
-    try {
-      console.log("Saving receipt for booking:", bookingData.booking_id);
-
-      const pdfBase64 = await generatePDFBase64();
-      console.log("PDF Base64 length:", pdfBase64.length);
-
-      const res = await fetch(`${API}/api/save-receipt-pdf`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          booking_id: bookingData.booking_id,
-          receipt_pdf: pdfBase64,
-        }),
-      });
-
-      const data = await res.json();
-      console.log("Save receipt response:", data);
-    } catch (err) {
-      console.error("Receipt save failed", err);
-    }
-  };
-
+ const saveReceiptPdfToDB = async () => {
+     try {
+       const pdfBase64 = await generatePDFBase64();
+       await saveReceiptPdfToDb(bookingData.booking_id, pdfBase64);
+     } catch (err) {
+       console.error("Receipt save failed", err);
+     }
+   };
 
   useEffect(() => {
     if (!bookingData?.booking_id) return;
 
     const timer = setTimeout(() => {
-      saveReceiptToDB();
+      saveReceiptPdfToDB();
     }, 1000); // wait 1 second for DOM render
 
     return () => clearTimeout(timer);
@@ -197,7 +152,7 @@ const ReceiptPage = () => {
             {/* <h2 style={{ margin: "10px 0" }}>Heathrow Elite Parking</h2> */}
             <p style={{ fontSize: "14px", lineHeight: "20px" }}>
               <br />
-              {getAirportContactNumber(bookingData.travelling_from)} | support@heathroweliteparking.co.uk
+              {contactPhone}{contactPhone && contactEmail ? " | " : ""}{contactEmail}
             </p>
 
           </div>
@@ -220,7 +175,7 @@ const ReceiptPage = () => {
                 textAlign: "center",
               }}
             >
-              Receipt #{bookingData.booking_id}
+              Receipt #{ref}
             </div>
 
             <div style={{ padding: "12px", fontSize: "14px" }}>
@@ -295,7 +250,7 @@ const ReceiptPage = () => {
               )}
 
               {/* ADD-ONS */}
-              {addons.cancellation_cover && (
+              {/* {addons.cancellation_cover && (
                 <tr>
                   <td>Cancellation Cover</td>
                   <td style={{ textAlign: "right" }}>£1.49</td>
@@ -307,7 +262,7 @@ const ReceiptPage = () => {
                   <td>SMS Confirmation</td>
                   <td style={{ textAlign: "right" }}>£0.75</td>
                 </tr>
-              )}
+              )} */}
 
               {/* ADD-ONS TOTAL */}
               {/* {addonsTotal > 0 && (
@@ -393,7 +348,7 @@ const ReceiptPage = () => {
           justifyContent: "center",
           gap: "20px",
           margin: "30px 0",
-          flexWrap: "wrap" // keeps it responsive on mobile
+          flexWrap: "wrap",
         }}
       >
         <button
@@ -411,23 +366,35 @@ const ReceiptPage = () => {
           Download Receipt (PDF)
         </button>
 
-        {/* <button
-          onClick={emailPDF}
-          disabled={isEmailing}
+         <button
+          onClick={handleEmailReceipt}
+          disabled={emailStatus === "sending" || emailStatus === "success"}
           style={{
-            background: "#005c25",
+            background: "#ffa200",
             color: "#fff",
             padding: "12px 30px",
             borderRadius: "30px",
             border: "none",
             fontWeight: "bold",
-            cursor: isEmailing ? "not-allowed" : "pointer",
+            cursor: emailStatus === "sending" ? "wait" : emailStatus === "success" ? "default" : "pointer",
+            opacity: emailStatus === "success" ? 0.75 : 1,
           }}
         >
-          {isEmailing ? "Sending..." : "Email Receipt (PDF)"}
-        </button> */}
+          {emailStatus === "sending" ? (
+            <><i className="fa-solid fa-spinner fa-spin me-2"></i>Sending…</>
+          ) : emailStatus === "success" ? (
+            <><i className="fa-solid fa-check me-2"></i>Receipt Sent</>
+          ) : (
+            <><i className="fa-solid fa-envelope me-2"></i>Email Receipt</>
+          )}
+        </button>
 
       </div>
+      {emailMessage && (
+        <p className={`text-center mt-2 ${emailStatus === "success" ? "text-success" : "text-danger"}`} style={{ fontSize: "13px" }}>
+          {emailMessage}
+        </p>
+      )}
 
 
       <Footer></Footer>

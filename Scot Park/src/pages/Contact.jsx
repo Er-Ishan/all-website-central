@@ -5,6 +5,7 @@ import Footer from "../component/Footer";
 import Copyright from "../component/Copyright";
 import ReCAPTCHA from "react-google-recaptcha";
 import NavbarElement from "../component/NavbarElement";
+import { apiFetch } from "../services/parkingApi";
 
 const API = import.meta.env.VITE_API_URL;
 
@@ -57,7 +58,7 @@ const Contact = () => {
     }
 
     try {
-      const res = await fetch(`${API}/api/support-ticket`, {
+      const res = await apiFetch(`${API}/api/support-ticket`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

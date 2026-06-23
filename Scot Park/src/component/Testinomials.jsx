@@ -1,4 +1,3 @@
-
 import { FaQuoteRight } from "react-icons/fa";
 export default function Testimonials() {
     return (

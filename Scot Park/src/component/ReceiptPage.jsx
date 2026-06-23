@@ -5,9 +5,7 @@ import logo from "../../public/img/scotpark_logo_dark.png";
 import Footer from "../component/Footer";
 import Copyright from "../component/Copyright";
 import NavbarElement from "../component/NavbarElement";
-import Topbar from "./Topbar";
-
-const API = import.meta.env.VITE_API_URL;
+import { saveReceiptPdfToDb, fetchCompanyInfo, sendBookingEmail } from "../services/parkingApi";
 
 
 const ReceiptPage = () => {
@@ -15,9 +13,16 @@ const ReceiptPage = () => {
   const bookingData = location.state?.bookingData || null;
   const addons = bookingData?.addons || {};
   const addonsTotal = bookingData?.addons_total || 0;
+  
+  const [companyInfo, setCompanyInfo] = useState(null);
   const [isEmailing, setIsEmailing] = React.useState(false);
-
+  const [emailStatus, setEmailStatus] = useState("idle"); // idle | sending | success | error
+  const [emailMessage, setEmailMessage] = useState("");
   const receiptRef = useRef();
+
+  useEffect(() => {
+    fetchCompanyInfo().then(info => { if (info) setCompanyInfo(info); });
+  }, []);
 
   const formatDate = (dateInput) => {
     const date = new Date(dateInput);
@@ -30,20 +35,10 @@ const ReceiptPage = () => {
     });
   };
 
-  const getAirportContactNumber = (airport) => {
-    const a = String(airport || "").toLowerCase();
-
-    if (a.includes("Glasgow")) {
-      return "07348186412"; // Glasgow number
-    }
-
-    if (a.includes("gatwick")) {
-      return "07348186412"; // Gatwick number (change if different)
-    }
-
-    return "07348186412"; // fallback
-  };
-
+  const contactPhone = companyInfo?.support_contact_no || companyInfo?.mobile_no || "";
+  const contactEmail = companyInfo?.support_email_address || "";
+  const refPrefix = companyInfo?.ref_prefix ?? "E";
+  const ref = String(bookingData.booking_id).padStart(8, "0");
 
   const currentTransactionDate = formatDate(new Date());
 
@@ -62,76 +57,36 @@ const ReceiptPage = () => {
   };
 
 
-  const emailPDF = async () => {
-    try {
-      setIsEmailing(true); // start loading
-
-      const pdfBase64 = await generatePDFBase64();
-
-      const res = await fetch(`${API}/api/email-receipt-pdf`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          booking_id: bookingData.booking_id,
-          email: bookingData.email,
-          first_name: bookingData.first_name,
-          receipt_pdf: pdfBase64
-        })
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        alert("Receipt emailed successfully!");
-      } else {
-        alert("Failed to email receipt");
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Something went wrong while emailing receipt");
-    } finally {
-      setIsEmailing(false); // stop loading
-    }
+  const handleEmailReceipt = async () => {
+    setEmailStatus("sending");
+    setEmailMessage("");
+    const result = await sendBookingEmail(bookingData.booking_id);
+    setEmailStatus(result.ok ? "success" : "error");
+    setEmailMessage(result.message);
   };
-
 
 
   const generatePDFBase64 = async () => {
-    const element = receiptRef.current;
-
-    const options = {
-      margin: 0.3,
+  const pdf = await html2pdf()
+    .set({
+      margin: 0.4,
       image: { type: "jpeg", quality: 1 },
       html2canvas: { scale: 2 },
-      jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
-    };
+      jsPDF: {
+        unit: "in",
+        format: "a4",
+        orientation: "portrait",
+      },
+    })
+    .from(receiptRef.current)
+    .outputPdf("datauristring");
 
-    const pdf = await html2pdf()
-      .set(options)
-      .from(element)
-      .outputPdf("datauristring");
-
-    return pdf.split(",")[1]; // remove data prefix
-  };
-
-  const saveReceiptToDB = async () => {
+  return pdf.split(",")[1];
+};
+  const saveReceiptPdfToDB = async () => {
     try {
-      console.log("Saving receipt for booking:", bookingData.booking_id);
-
       const pdfBase64 = await generatePDFBase64();
-      console.log("PDF Base64 length:", pdfBase64.length);
-
-      const res = await fetch(`${API}/api/save-receipt-pdf`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          booking_id: bookingData.booking_id,
-          receipt_pdf: pdfBase64,
-        }),
-      });
-
-      const data = await res.json();
-      console.log("Save receipt response:", data);
+      await saveReceiptPdfToDb(bookingData.booking_id, pdfBase64);
     } catch (err) {
       console.error("Receipt save failed", err);
     }
@@ -142,7 +97,7 @@ const ReceiptPage = () => {
     if (!bookingData?.booking_id) return;
 
     const timer = setTimeout(() => {
-      saveReceiptToDB();
+      saveReceiptPdfToDB();
     }, 1000); // wait 1 second for DOM render
 
     return () => clearTimeout(timer);
@@ -197,7 +152,7 @@ const ReceiptPage = () => {
             {/* <h2 style={{ margin: "10px 0" }}>SCOT Parking</h2> */}
             <p style={{ fontSize: "14px", lineHeight: "20px" }}>
               <br />
-              {getAirportContactNumber(bookingData.travelling_from)} | support@scotpark.co.uk
+              {contactPhone}{contactPhone && contactEmail ? " | " : ""}{contactEmail}
             </p>
 
           </div>
@@ -213,14 +168,14 @@ const ReceiptPage = () => {
           >
             <div
               style={{
-                backgroundColor: "#6dbb2c",
+                backgroundColor: "#0A1A3A",
                 padding: "12px",
                 color: "#fff",
                 fontWeight: "bold",
                 textAlign: "center",
               }}
             >
-              Receipt #{bookingData.booking_id}
+             Receipt #{refPrefix}-{ref}
             </div>
 
             <div style={{ padding: "12px", fontSize: "14px" }}>
@@ -343,7 +298,7 @@ const ReceiptPage = () => {
             }}
           >
             <thead>
-              <tr style={{ backgroundColor: "#6dbb2c", color: "#fff" }}>
+              <tr style={{ backgroundColor: "#0A1A3A", color: "#fff" }}>
                 <th style={{ padding: "10px" }}>Product</th>
                 <th style={{ padding: "10px" }}>Airport</th>
                 <th style={{ padding: "10px" }}>Drop-off</th>
@@ -393,7 +348,7 @@ const ReceiptPage = () => {
           justifyContent: "center",
           gap: "20px",
           margin: "30px 0",
-          flexWrap: "wrap" // keeps it responsive on mobile
+          flexWrap: "wrap",
         }}
       >
         <button
@@ -408,26 +363,38 @@ const ReceiptPage = () => {
             cursor: "pointer",
           }}
         >
+          <i className="fa-solid fa-download me-2"></i>
           Download Receipt (PDF)
         </button>
 
-        {/* <button
-          onClick={emailPDF}
-          disabled={isEmailing}
+        <button
+          onClick={handleEmailReceipt}
+          disabled={emailStatus === "sending" || emailStatus === "success"}
           style={{
-            background: "#0A1A3A",
+            background: "#ffa200",
             color: "#fff",
             padding: "12px 30px",
             borderRadius: "30px",
             border: "none",
             fontWeight: "bold",
-            cursor: isEmailing ? "not-allowed" : "pointer",
+            cursor: emailStatus === "sending" ? "wait" : emailStatus === "success" ? "default" : "pointer",
+            opacity: emailStatus === "success" ? 0.75 : 1,
           }}
         >
-          {isEmailing ? "Sending..." : "Email Receipt (PDF)"}
-        </button> */}
-
+          {emailStatus === "sending" ? (
+            <><i className="fa-solid fa-spinner fa-spin me-2"></i>Sending…</>
+          ) : emailStatus === "success" ? (
+            <><i className="fa-solid fa-check me-2"></i>Receipt Sent</>
+          ) : (
+            <><i className="fa-solid fa-envelope me-2"></i>Email Receipt</>
+          )}
+        </button>
       </div>
+      {emailMessage && (
+        <p className={`text-center mt-2 ${emailStatus === "success" ? "text-success" : "text-danger"}`} style={{ fontSize: "13px" }}>
+          {emailMessage}
+        </p>
+      )}
 
 
       <Footer></Footer>

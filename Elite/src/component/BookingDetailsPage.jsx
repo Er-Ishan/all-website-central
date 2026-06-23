@@ -1,97 +1,118 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation , useNavigate} from "react-router-dom";
 import html2pdf from "html2pdf.js";
 import Topbar from "./Topbar";
 import NavbarElement from "../component/NavbarElement";
 import Footer from "../component/Footer";
 import Copyright from "../component/Copyright";
 import logo from "../../public/img/Elitelogo.png";
-
-const API = import.meta.env.VITE_API_URL;
+import {
+  fetchCompanyInfo,
+  saveReceiptPdfToDb,
+  sendBookingEmail,
+} from "../services/parkingApi";
 
 const BookingDetailsPage = () => {
-    const location = useLocation();
-    const [sending, setSending] = React.useState(false);
-    const bookingData = location.state?.bookingData || null;
-    const addons = bookingData?.addons || {};
-    const receiptRef = useRef();
+  const [emailStatus, setEmailStatus] = useState("idle");
+  const [emailMessage, setEmailMessage] = useState("");
+  const [isEmailing, setIsEmailing] = useState(false);
+  const location = useLocation();
+  const [company, setCompany] = useState(null);
+  const [sending, setSending] = React.useState(false);
+  const bookingData = location.state?.bookingData || null;
+  const addons = bookingData?.addons || {};
+  const receiptRef = useRef();
 
-    const formatDate = (dateInput) => {
-        if (!dateInput) return "-";
-        return new Date(dateInput).toLocaleString("en-GB", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    };
+  const refPrefix = company?.ref_prefix ?? "E";
+  const ref = String(bookingData.booking_id).padStart(8, "0");
 
+  const companyName = company?.name ?? "";
+  const formatDate = (dateInput) => {
+    if (!dateInput) return "-";
+    return new Date(dateInput).toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
+  const [isMobile, setIsMobile] = useState(false);
 
-    const currentTransactionDate = formatDate(new Date());
+  const handleDownload = () => {
+    if (detailsRef.current) {
+      downloadPdfFromElement(
+        receiptRef.current,
+        `booking_details_${bookingData.booking_id}.pdf`,
+      );
+    }
+  };
+  useEffect(() => {
+    fetchCompanyInfo().then((info) => {
+      if (info) setCompany(info);
+    });
+  }, []);
+  const currentTransactionDate = formatDate(new Date());
+  const handleEmailBookingDetails = async () => {
+    setEmailStatus("sending");
+    setEmailMessage("");
+    const result = await sendBookingEmail(Number(bookingData.booking_id));
+    setEmailStatus(result.ok ? "success" : "error");
+    setEmailMessage(result.message);
+  };
 
-    /* ==========================
+  /* ==========================
         DOWNLOAD PDF
     ========================== */
-    const downloadPDF = () => {
-        const element = receiptRef.current;
+  const downloadPDF = () => {
+    const element = receiptRef.current;
 
-        html2pdf()
-            .set({
-                margin: 0.4,
-                filename: `Booking_${bookingData.booking_id}.pdf`,
-                image: { type: "jpeg", quality: 1 },
-                html2canvas: { scale: 2 },
-                jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
-            })
-            .from(element)
-            .save();
-    };
+    html2pdf()
+      .set({
+        margin: 0.4,
+        filename: `Booking_${bookingData.booking_id}.pdf`,
+        image: { type: "jpeg", quality: 1 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
+      })
+      .from(element)
+      .save();
+  };
 
-    /* ==========================
+  /* ==========================
         SAVE PDF TO DB
     ========================== */
-    const generatePDFBase64 = async () => {
-        const pdf = await html2pdf()
-            .set({
-                margin: 0.4,
-                image: { type: "jpeg", quality: 1 },
-                html2canvas: { scale: 2 },
-                jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
-            })
-            .from(receiptRef.current)
-            .outputPdf("datauristring");
+  const generatePDFBase64 = async () => {
+    const pdf = await html2pdf()
+      .set({
+        margin: 0.4,
+        image: { type: "jpeg", quality: 1 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
+      })
+      .from(receiptRef.current)
+      .outputPdf("datauristring");
 
-        return pdf.split(",")[1];
-    };
+    return pdf.split(",")[1];
+  };
 
-    const saveReceiptToDB = async () => {
-        try {
-            const pdfBase64 = await generatePDFBase64();
+  const saveReceiptToDB = async () => {
+    try {
+      const pdfBase64 = await generatePDFBase64();
+      await saveReceiptPdfToDb(bookingData.booking_id, pdfBase64);
+    } catch (err) {
+      console.error("Receipt save failed", err);
+    }
+  };
 
-            await fetch(`${API}/api/save-receipt-pdf`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    booking_id: bookingData.booking_id,
-                    receipt_pdf: pdfBase64,
-                }),
-            });
-        } catch (err) {
-            console.error("Receipt save failed", err);
-        }
-    };
+  useEffect(() => {
+    if (!bookingData?.booking_id) return;
+    const timer = setTimeout(saveReceiptToDB, 1000);
+    return () => clearTimeout(timer);
+  }, [bookingData]);
 
-    useEffect(() => {
-        if (!bookingData?.booking_id) return;
-        const timer = setTimeout(saveReceiptToDB, 1000);
-        return () => clearTimeout(timer);
-    }, [bookingData]);
-
-    if (!bookingData) return <h2>No Receipt Data</h2>;
-
-    const [isMobile, setIsMobile] = useState(false);
+  if (!bookingData) return <h2>No Receipt Data</h2>;
 
   useEffect(() => {
     const checkScreen = () => setIsMobile(window.innerWidth <= 768);
@@ -100,174 +121,193 @@ const BookingDetailsPage = () => {
     return () => window.removeEventListener("resize", checkScreen);
   }, []);
 
-    return (
-        <>
-            
-            <NavbarElement />
+  return (
+    <>
+      <NavbarElement />
 
-            {/* ================= RECEIPT ================= */}
-            <div
-                ref={receiptRef}
-                style={{
-                    maxWidth: "900px",
-                    margin: "20px auto",
-                    background: "#fff",
-                    border: "1px solid #000",
-                    padding: "20px",
-                    fontFamily: "Arial, sans-serif",
-                }}
-            >
-                {/* HEADER */}
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
-                    <div style={{ flex: "1 1 260px" }}>
-                        <img src={logo} alt="Logo" style={{ width: "200px" }} />
-                        <p style={{ fontSize: "12px", marginTop: "6px" }}>
-                            Heathrow Elite Parking
-                        </p>
-                    </div>
+      {/* ================= RECEIPT ================= */}
+      <div
+        ref={receiptRef}
+        style={{
+          maxWidth: "900px",
+          margin: "20px auto",
+          background: "#fff",
+          border: "1px solid #000",
+          padding: "20px",
+          fontFamily: "Arial, sans-serif",
+        }}
+      >
+        {/* HEADER */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
+          <div style={{ flex: "1 1 260px" }}>
+            <img src={logo} alt="Logo" style={{ width: "200px" }} />
+            <p style={{ fontSize: "12px", marginTop: "6px" }}>
+              Heathrow Elite Parking
+            </p>
+          </div>
 
-                    <div
-                        style={{
-                            flex: "1 1 200px",
-                            textAlign: "right",
-                        }}
-                    >
-                        <h3 style={{ marginBottom: "6px" }}>BOOKING DETAILS</h3>
-                        <p style={{ fontSize: "12px" }}>
-                            Date: {currentTransactionDate}
-                        </p>
-                    </div>
-                </div>
+          <div
+            style={{
+              flex: "1 1 200px",
+              textAlign: "right",
+            }}
+          >
+            <h3 style={{ marginBottom: "6px" }}>BOOKING DETAILS</h3>
+            <p style={{ fontSize: "12px" }}>Date: {currentTransactionDate}</p>
+            <p style={{ fontSize: "12px", fontWeight: "bold" }}>
+              Ref: {ref}
+            </p>
+          </div>
+        </div>
 
-                {/* RESPONSIVE TABLE WRAPPER */}
-                <div style={{ overflowX: "auto", marginTop: "20px" }}>
-                    {/* CLIENT DETAILS */}
+        {/* RESPONSIVE TABLE WRAPPER */}
+        <div style={{ overflowX: "auto", marginTop: "20px" }}>
+          {/* CLIENT DETAILS */}
 
-                    <table width="100%" border="1" cellPadding="6" style={{ borderCollapse: "collapse", fontSize: "13px" }}>
-                        <tbody>
-                            <tr style={{ background: "#eee", fontWeight: "bold" }}>
-                                <td colSpan="5">CUSTOMER DETAILS</td>
-                            </tr>
-                            <tr style={{ fontWeight: "bold" }}>
-                                <td className="text-center">Title</td>
-                                <td className="text-center">First Name</td>
-                                <td className="text-center">Last Name</td>
-                                <td className="text-center">Email</td>
-                                <td className="text-center">Mobile</td>
-                            </tr>
-                            <tr>
-                                <td className="text-center">{bookingData.title}</td>
-                                <td className="text-center">{bookingData.first_name}</td>
-                                <td className="text-center">{bookingData.last_name}</td>
-                                <td className="text-center">{bookingData.email}</td>
-                                <td className="text-center">{bookingData.mobile}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+          <table
+            width="100%"
+            border="1"
+            cellPadding="6"
+            style={{ borderCollapse: "collapse", fontSize: "13px" }}
+          >
+            <tbody>
+              <tr style={{ background: "#eee", fontWeight: "bold" }}>
+                <td colSpan="5">CUSTOMER DETAILS</td>
+              </tr>
+              <tr style={{ fontWeight: "bold" }}>
+                <td className="text-center">Title</td>
+                <td className="text-center">First Name</td>
+                <td className="text-center">Last Name</td>
+                <td className="text-center">Email</td>
+                <td className="text-center">Mobile</td>
+              </tr>
+              <tr>
+                <td className="text-center">{bookingData.title}</td>
+                <td className="text-center">{bookingData.first_name}</td>
+                <td className="text-center">{bookingData.last_name}</td>
+                <td className="text-center">{bookingData.email}</td>
+                <td className="text-center">{bookingData.mobile}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-                {/* RESPONSIVE TABLE WRAPPER */}
-                <div style={{ overflowX: "auto", marginTop: "20px" }}>
-                    {/* CLIENT DETAILS */}
+        {/* RESPONSIVE TABLE WRAPPER */}
+        <div style={{ overflowX: "auto", marginTop: "20px" }}>
+          {/* CLIENT DETAILS */}
 
-                    <table width="100%" border="1" cellPadding="6" style={{ borderCollapse: "collapse", fontSize: "13px" }}>
-                        <tbody>
-                            <tr style={{ background: "#eee", fontWeight: "bold" }}>
-                                <td colSpan="5">VEHICLE DETAILS</td>
-                            </tr>
-                            <tr style={{ fontWeight: "bold" }}>
-                                <td className="text-center">Reg.No.</td>
-                                <td className="text-center">Make</td>
-                                <td className="text-center">Model</td>
-                                <td className="text-center">Color</td>
-                                <td className="text-center">Passengers</td>
-                            </tr>
-                            <tr>
-                                <td className="text-center">{bookingData.vehicle_registration}</td>
-                                <td className="text-center">{bookingData.vehicle_make}</td>
-                                <td className="text-center">{bookingData.vehicle_model}</td>
-                                <td className="text-center">{bookingData.vehicle_colour}</td>
-                                <td className="text-center">{bookingData.passengers}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+          <table
+            width="100%"
+            border="1"
+            cellPadding="6"
+            style={{ borderCollapse: "collapse", fontSize: "13px" }}
+          >
+            <tbody>
+              <tr style={{ background: "#eee", fontWeight: "bold" }}>
+                <td colSpan="5">VEHICLE DETAILS</td>
+              </tr>
+              <tr style={{ fontWeight: "bold" }}>
+                <td className="text-center">Reg.No.</td>
+                <td className="text-center">Make</td>
+                <td className="text-center">Model</td>
+                <td className="text-center">Color</td>
+                <td className="text-center">Passengers</td>
+              </tr>
+              <tr>
+                <td className="text-center">
+                  {bookingData.vehicle_registration}
+                </td>
+                <td className="text-center">{bookingData.vehicle_make}</td>
+                <td className="text-center">{bookingData.vehicle_model}</td>
+                <td className="text-center">{bookingData.vehicle_colour}</td>
+                <td className="text-center">{bookingData.passengers}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
+        <div style={{ overflowX: "auto", marginTop: "20px" }}>
+          {/* PAYMENT SUMMARY */}
+          <table
+            width="100%"
+            border="1"
+            cellPadding="6"
+            style={{ borderCollapse: "collapse", fontSize: "13px" }}
+          >
+            <tbody>
+              <tr style={{ background: "#eee", fontWeight: "bold" }}>
+                <td colSpan="2">FLIGHT DETAILS</td>
+              </tr>
+              <tr>
+                <td>Depart Flight</td>
+                <td align="right">{bookingData.depart_flight}</td>
+              </tr>
 
+              <tr>
+                <td>Depart Terminal</td>
+                <td align="right">{bookingData.depart_terminal}</td>
+              </tr>
 
-                <div style={{ overflowX: "auto", marginTop: "20px" }}>
-                    {/* PAYMENT SUMMARY */}
-                    <table width="100%" border="1" cellPadding="6" style={{ borderCollapse: "collapse", fontSize: "13px" }}>
-                        <tbody>
-                            <tr style={{ background: "#eee", fontWeight: "bold" }}>
-                                <td colSpan="2">FLIGHT DETAILS</td>
-                            </tr>
-                            <tr>
-                                <td>Depart Flight</td>
-                                <td align="right">{bookingData.depart_flight}</td>
-                            </tr>
+              <tr>
+                <td>Return Flight</td>
+                <td align="right">{bookingData.return_flight}</td>
+              </tr>
 
-                            <tr>
-                                <td>Depart Terminal</td>
-                                <td align="right">{bookingData.depart_terminal}</td>
-                            </tr>
+              <tr>
+                <td>Return Terminal</td>
+                <td align="right">{bookingData.return_terminal}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-                            <tr>
-                                <td>Return Flight</td>
-                                <td align="right">{bookingData.return_flight}</td>
-                            </tr>
+        <div style={{ overflowX: "auto", marginTop: "20px" }}>
+          {/* PAYMENT SUMMARY */}
+          <table
+            width="100%"
+            border="1"
+            cellPadding="6"
+            style={{ borderCollapse: "collapse", fontSize: "13px" }}
+          >
+            <tbody>
+              <tr style={{ background: "#eee", fontWeight: "bold" }}>
+                <td colSpan="2">BOOKING DETAILS</td>
+              </tr>
 
-                            <tr>
-                                <td>Return Terminal</td>
-                                <td align="right">{bookingData.return_terminal}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+              <tr>
+                <td>Travelling From</td>
+                <td align="right">{bookingData.travelling_from}</td>
+              </tr>
 
-                <div style={{ overflowX: "auto", marginTop: "20px" }}>
-                    {/* PAYMENT SUMMARY */}
-                    <table width="100%" border="1" cellPadding="6" style={{ borderCollapse: "collapse", fontSize: "13px" }}>
-                        <tbody>
-                            <tr style={{ background: "#eee", fontWeight: "bold" }}>
-                                <td colSpan="2">BOOKING DETAILS</td>
-                            </tr>
-
-
-                            <tr>
-                                <td>Travelling From</td>
-                                <td align="right">{bookingData.travelling_from}</td>
-                            </tr>
-
-                            {/* <tr>
+              {/* <tr>
                 <td>Serice Provider</td>
                 <td align="right">{bookingData.service_provider}</td>
               </tr> */}
 
-                            <tr>
-                                <td>Service</td>
-                                <td align="right">{bookingData.service}</td>
-                            </tr>
+              <tr>
+                <td>Service</td>
+                <td align="right">{bookingData.service}</td>
+              </tr>
 
-                            <tr>
-                                <td>Drop Off Date</td>
-                                <td align="right">{formatDate(bookingData.drop_off_date)}</td>
-                            </tr>
+              <tr>
+                <td>Drop Off Date</td>
+                <td align="right">{formatDate(bookingData.drop_off_date)}</td>
+              </tr>
 
-                            <tr>
-                                <td>Return Date</td>
-                                <td align="right">{formatDate(bookingData.return_date)}</td>
-                            </tr>
+              <tr>
+                <td>Return Date</td>
+                <td align="right">{formatDate(bookingData.return_date)}</td>
+              </tr>
 
-                            <tr>
-                                <td>Days</td>
-                                <td align="right">{bookingData.no_of_days}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+              <tr>
+                <td>Days</td>
+                <td align="right">{bookingData.no_of_days}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-                {/* <div style={{ overflowX: "auto", marginTop: "20px" }}>
+        {/* <div style={{ overflowX: "auto", marginTop: "20px" }}>
                     <table width="100%" border="1" cellPadding="6" style={{ borderCollapse: "collapse", fontSize: "13px" }}>
                         <tbody>
                             <tr style={{ background: "#eee", fontWeight: "bold" }}>
@@ -314,47 +354,46 @@ const BookingDetailsPage = () => {
                     </table>
                 </div> */}
 
+        <p style={{ marginTop: "30px", fontSize: "12px", textAlign: "center" }}>
+          Thank you for your booking. Please keep this document for your
+          records.
+        </p>
+      </div>
 
+      {/* DOWNLOAD BUTTON */}
+      {/* ACTION BUTTONS */}
+      <div
+        style={{
+          textAlign: "center",
+          marginBottom: "40px",
+          display: "flex",
+          justifyContent: "center",
+          gap: "20px",
+        }}
+      >
+        {/* Download PDF */}
+        <button
+          onClick={downloadPDF}
+          style={{
+            background: "#005c25",
+            color: "#fff",
+            padding: "12px 34px",
+            borderRadius: "30px",
+            border: "none",
+            fontWeight: "bold",
+            cursor: "pointer",
+          }}
+        >
+          Download Booking PDF
+        </button>
 
-                <p style={{ marginTop: "30px", fontSize: "12px", textAlign: "center" }}>
-                    Thank you for your booking. Please keep this document for your records.
-                </p>
-            </div>
-
-            {/* DOWNLOAD BUTTON */}
-            {/* ACTION BUTTONS */}
-            <div
-                style={{
-                    textAlign: "center",
-                    marginBottom: "40px",
-                    display: "flex",
-                    justifyContent: "center",
-                    gap: "20px",
-                }}
-            >
-                {/* Download PDF */}
-                <button
-                    onClick={downloadPDF}
-                    style={{
-                        background: "#005c25",
-                        color: "#fff",
-                        padding: "12px 34px",
-                        borderRadius: "30px",
-                        border: "none",
-                        fontWeight: "bold",
-                        cursor: "pointer",
-                    }}
-                >
-                    Download Booking PDF
-                </button>
-
-                {/* Email PDF */}
-                {/* <button
+        {/* Email PDF */}
+        {/* <button
                     onClick={async () => {
                         setSending(true);
                         try {
                             const pdfBase64 = await generatePDFBase64();
-                            const res = await fetch(`${API}/api/email-booking`, {
+                            const res = await apiFetch(`${API}/api/email-booking`, {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({
@@ -385,13 +424,54 @@ const BookingDetailsPage = () => {
                 >
                     {sending ? "Sending..." : "Email Booking PDF"}
                 </button> */}
-            </div>
 
+        <button
+          onClick={handleEmailBookingDetails}
+          disabled={emailStatus === "sending" || emailStatus === "success"}
+          style={{
+            background: "#ffa200",
+            color: "#fff",
+            padding: "12px 34px",
+            borderRadius: "30px",
+            border: "none",
+            fontWeight: "bold",
+            cursor:
+              emailStatus === "sending"
+                ? "wait"
+                : emailStatus === "success"
+                  ? "default"
+                  : "pointer",
+            opacity: emailStatus === "success" ? 0.75 : 1,
+          }}
+        >
+          {emailStatus === "sending" ? (
+            <>
+              <i className="fa-solid fa-spinner fa-spin me-2"></i>Sending…
+            </>
+          ) : emailStatus === "success" ? (
+            <>
+              <i className="fa-solid fa-check me-2"></i>Details Sent
+            </>
+          ) : (
+            <>
+              <i className="fa-solid fa-envelope me-2"></i>Email Booking Details
+            </>
+          )}
+        </button>
+      </div>
+      {emailMessage && (
+        <p
+          className={`text-center mt-2 ${emailStatus === "success" ? "text-success" : "text-danger"}`}
+          style={{ fontSize: "13px" }}
+        >
+          {emailMessage}
+        </p>
+      )}
 
-            <Footer />
-            <Copyright />
-        </>
-    );
+      <Footer />
+      <Copyright />
+    </>
+  );
 };
 
 export default BookingDetailsPage;

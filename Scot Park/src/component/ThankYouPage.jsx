@@ -116,7 +116,9 @@ const ThankYouPage = () => {
                                 onClick={() =>
                                     navigate("/booking-details", {
                                         state: { bookingData },
+                                        
                                     })
+                                    
                                 }
                             >
                                 Booking Details

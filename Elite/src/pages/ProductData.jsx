@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState,useMemo } from 'react'
 import { Helmet } from "react-helmet";
 import Topbar from "../component/Topbar"
 import Navbar from "../component/Navbar"
@@ -11,6 +11,7 @@ import { FaInfoCircle } from "react-icons/fa";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import planeLoader from "../assets/new-plane.gif";
+import optionalLogo from "../assets/EliteLogo.png";
 
 import { IoIosCheckbox } from "react-icons/io";
 import {
@@ -40,7 +41,7 @@ const isHeathrowClosedTime = (timeStr) => {
 };
 
 import NavbarElement from '../component/NavbarElement';
-
+import { apiFetch } from '../services/parkingApi';
 const API = import.meta.env.VITE_API_URL;
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -157,10 +158,6 @@ const ProductData = () => {
     }
 
 
-    useEffect(() => {
-        if (!selectedAirport || !dropDateState || !returnDateState) return;
-
-    }, [dropDateState, returnDateState, selectedAirport]);
 
     const validatePromoCode = async (code = promoCode) => {
 
@@ -171,7 +168,7 @@ const ProductData = () => {
         }
 
         try {
-            const res = await fetch(`${API}/api/promocode/${promoCode}`);
+            const res = await apiFetch(`${API}/api/promocode/${encodeURIComponent(normalized)}`);
             const data = await res.json();
 
             if (data.success) {
@@ -231,19 +228,33 @@ const ProductData = () => {
 
 
     useEffect(() => {
-        fetch(`${API}/api/data/airports`)
-            .then((res) => res.json())
-            .then((data) => {
-                setAirportList(data);
-
-                // auto-select first airport if none selected
-                if (!localStorage.getItem("selectedAirport") && data.length > 0) {
-                    setSelectedAirport(data[0].airport_name);
-                    localStorage.setItem("selectedAirport", data[0].airport_name);
-                }
-            })
-            .catch((err) => console.error("Failed to load airports", err));
-    }, []);
+            apiFetch(`${API}/api/data/airports`)
+                .then((res) => res.json())
+                .then((data) => {
+                    let list = [];
+                    if (Array.isArray(data)) list = data;
+                    else if (Array.isArray(data.airports)) list = data.airports;
+                    else if (Array.isArray(data.data)) list = data.data;
+    
+                    setAirportList(list);
+                    if (!list.length) return;
+    
+                    const stored = localStorage.getItem("selectedAirport");
+                    const validNames = list.map((a) => a.airport_name);
+                    // use stored airport only if it's still valid for this company
+                    const airport = (stored && validNames.includes(stored))
+                        ? stored
+                        : list[0].airport_name;
+    
+                    if (airport !== stored) {
+                        localStorage.setItem("selectedAirport", airport);
+                    }
+                    setSelectedAirport(airport);
+                    setAppliedAirport(airport);
+                    fetchAllProducts(airport);
+                })
+                .catch((err) => console.error("Failed to load airports", err));
+        }, []);
 
     useEffect(() => {
         const storedPromo = localStorage.getItem("promoCode");
@@ -259,7 +270,7 @@ const ProductData = () => {
 
     const handleMoreInfo = async (id) => {
         try {
-            const res = await fetch(`${API}/api/parking-product/${id}`);
+            const res = await apiFetch(`${API}/api/parking-product/${id}`);
             const result = await res.json();
 
             if (result.success) {
@@ -285,7 +296,6 @@ const ProductData = () => {
     };
 
     const navigate = useNavigate();
-
     const formatDate = (dateStr) => {
         const date = new Date(dateStr);
         return date.toLocaleDateString("en-GB", {
@@ -296,77 +306,13 @@ const ProductData = () => {
     };
 
     // Fetch All Products Initially
-    useEffect(() => {
-        const init = async () => {
-            if (promoCode) {
-                const ok = await validatePromoCode(promoCode);
-                if (!ok) return;
-            }
-            fetchAllProducts();
-        };
-
-        init();
-    }, []);
-
-    const isHeathrowTimeBlocked = () => {
-        if (selectedAirport !== "Heathrow") return false;
-
-        const dropTime = dropDateState?.split(" ")[1];
-        const returnTime = returnDateState?.split(" ")[1];
-
-        if (
-            isHeathrowClosedTime(dropTime) ||
-            isHeathrowClosedTime(returnTime)
-        ) {
-            setProducts([]); // 🚫 Clear products
-            setTimeWarning(
-                "Parking is not available for your selected time please change the time and try again to see the available parking options"
-            );
-            return true;
-        }
-
-        setTimeWarning("");
-        return false;
-    };
+  
+  
 
 
-    const fetchAllProducts = () => {
-
-        setLoading(true);
-
-        // 🚫 STOP if Heathrow time blocked
-        if (isHeathrowTimeBlocked()) {
-            return;
-        }
-
-        fetch(`${API}/api/parking-product`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                dropDate: dropDateState,
-                returnDate: returnDateState,
-                airport: selectedAirport
-            })
-        })
-            .then(res => res.json())
-            .then(data => {
-                const list = Array.isArray(data.data) ? data.data : [];
-                setProducts(list);
-                setLoading(false);
-
-                list.forEach(p => {
-                    if (p?.id) {
-                        fetchDynamicPrice(p.id, dropDateState, returnDateState);
-                    }
-                });
-            })
-            .catch(err => console.error(err));
-    };
-
-    // send selected dates in request
-    const fetchDynamicPrice = async (product_id, dropDate, returnDate) => {
+   const fetchDynamicPrice = async (product_id, dropDate, returnDate) => {
         try {
-            const res = await fetch(`${API}/api/calculate-price`, {
+            const res = await apiFetch(`${API}/api/calculate-price`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -376,21 +322,95 @@ const ProductData = () => {
                 })
             });
 
-            if (!res.ok) return;
+            if (!res.ok) return null;
 
             const result = await res.json();
+            if (!result?.success) return null;
 
-            if (result.success) {
-                setPricing(prev => ({
-                    ...prev,
-                    [product_id]: result.total_price
-                }));
-            }
-
+            const priceNum = Number(result.total_price);
+            return Number.isFinite(priceNum) ? priceNum : null;
         } catch (error) {
             console.error("Fetch error:", error);
+            return null;
         }
     };
+
+    const fetchAllProducts = async (airportOverride) => {
+        try {
+            setLoading(true);
+
+            const airport = airportOverride || localStorage.getItem("selectedAirport") || appliedAirport;
+            const dropDate = localStorage.getItem("dropDate") || dropDateState;
+            const returnDate = localStorage.getItem("returnDate") || returnDateState;
+
+            if (!airport) { setLoading(false); return; }
+
+            const res = await apiFetch(`${API}/api/parking-product`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ dropDate, returnDate, airport }),
+            });
+            const data = await res.json();
+
+            let list = [];
+
+            if (Array.isArray(data.data)) {
+                list = data.data;
+            } else if (Array.isArray(data)) {
+                list = data;
+            }
+
+            setProducts(list);
+
+            if (dropDateState && returnDateState && list.length) {
+                // Limit concurrency to avoid flooding backend/DB (and reduce UI re-renders by batching state updates)
+                const CONCURRENCY = 6;
+                const nextPricing = {};
+
+                for (let i = 0; i < list.length; i += CONCURRENCY) {
+                    const chunk = list.slice(i, i + CONCURRENCY);
+                    const results = await Promise.all(
+                        chunk.map(async (p) => {
+                            if (!p?.id) return null;
+                            const price = await fetchDynamicPrice(p.id, dropDateState, returnDateState);
+                            return price === null ? null : { id: p.id, price };
+                        })
+                    );
+
+                    for (const r of results) {
+                        if (r) nextPricing[r.id] = r.price;
+                    }
+                }
+
+                setPricing((prev) => ({ ...prev, ...nextPricing }));
+            }
+
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false); // ✅ STOP ONLY AFTER DONE
+        }
+    };
+
+    const filteredProducts = useMemo(() => {
+        return products
+            .filter((p) => {
+                const matchAirport =
+                    !appliedAirport || p.airport_name === appliedAirport;
+
+                const matchService =
+                    appliedServiceType === "All"
+                        ? true
+                        : p.service_type === appliedServiceType;
+
+                return matchAirport && matchService;
+            })
+            .sort((a, b) => {
+                const priceA = getFinalPrice(a);
+                const priceB = getFinalPrice(b);
+                return priceA - priceB;
+            });
+    }, [products, appliedAirport, appliedServiceType, pricing, promoData]);
 
     // SEARCH BUTTON CLICK LOGIC
     const handleSearch = async (e) => {
@@ -417,14 +437,11 @@ const ProductData = () => {
         localStorage.setItem("returnDate", returnDateState);
 
         setPricing({});
-        fetchAllProducts();
-
-        setTimeout(() => {
-            setLoading(false);
-        }, 1500);
+       
+       await fetchAllProducts();
     };
 
-    const getFinalPrice = (item) => {
+    function getFinalPrice(item) {
         const basePrice = Number(pricing[item.id] || 0);
 
         if (!basePrice) return Infinity; // products without price go last
@@ -442,43 +459,43 @@ const ProductData = () => {
 
 
 
-    const filteredProducts = products
-        .filter((p) => {
-            const matchAirport =
-                !appliedAirport || p.airport_name === appliedAirport;
+    // const filteredProducts = products
+    //     .filter((p) => {
+    //         const matchAirport =
+    //             !appliedAirport || p.airport_name === appliedAirport;
 
-            const matchService =
-                appliedServiceType === "All"
-                    ? true
-                    : p.service_type === appliedServiceType;
+    //         const matchService =
+    //             appliedServiceType === "All"
+    //                 ? true
+    //                 : p.service_type === appliedServiceType;
 
-            return matchAirport && matchService;
-        })
-        .sort((a, b) => {
-            const priceA = getFinalPrice(a);
-            const priceB = getFinalPrice(b);
+    //         return matchAirport && matchService;
+    //     })
+    //     .sort((a, b) => {
+    //         const priceA = getFinalPrice(a);
+    //         const priceB = getFinalPrice(b);
 
-            return priceA - priceB; // 🔥 LOW → HIGH
-        });
-
-
+    //         return priceA - priceB; 
+    //     });
 
 
 
 
-    const BASE_URL = "https://www.heathroweliteparking.co.uk";
+
+
+ // const BASE_URL = "https://www.heathroweliteparking.co.uk";
 
     return (
         <>
             <Helmet>
-                <title>Book Heathrow &amp; Gatwick Airport Parking | Heathrow Elite Parking</title>
+                {/* <title>Book Heathrow &amp; Gatwick Airport Parking | Heathrow Elite Parking</title>
                 <meta name="description" content="Book Heathrow and Gatwick airport park and ride parking. Choose your dates and terminal for secure, affordable airport parking with shuttle service." />
                 <meta name="keywords" content="book Heathrow parking, Heathrow airport parking booking, Gatwick parking, park and ride booking" />
                 <meta name="robots" content="index, follow" />
                 <link rel="canonical" href={`${BASE_URL}/product`} />
                 <meta property="og:title" content="Book Airport Parking | Heathrow Elite Parking" />
                 <meta property="og:description" content="Book Heathrow and Gatwick airport park and ride parking with shuttle to terminals." />
-                <meta property="og:type" content="website" />
+                <meta property="og:type" content="website" /> */}
             </Helmet>
             {/* <Topbar /> */}
             <NavbarElement />
@@ -1108,19 +1125,16 @@ const ProductData = () => {
 
                                             {/* LEFT – IMAGE */}
                                             <div className="flex-shrink-0">
-                                                <img
-                                                    src={
-                                                        item.image_data ||
-                                                        "https://blog.getmyparking.com/wp-content/uploads/2018/07/airport-parking-1.jpg"
-                                                    }
-                                                    alt={item.product_name}
-                                                    style={{
-                                                        width: "140px",
-                                                        height: "80px",
-                                                        objectFit: "contain"
-                                                    }}
-                                                />
-                                            </div>
+                                                                                            <img
+                                                                                                src={item.image_data || optionalLogo}
+                                                                                                alt={item.product_name}
+                                                                                                style={{
+                                                                                                    width: "140px",
+                                                                                                    height: "80px",
+                                                                                                    objectFit: "contain"
+                                                                                                }}
+                                                                                            />
+                                                                                        </div>
 
                                             {/* CENTER – DETAILS */}
                                             <div className="flex-grow-1">
@@ -1292,22 +1306,10 @@ const ProductData = () => {
 
                                     ) : (
                                         <div className="pricing-card">
-                                            <img
-                                                src={
-                                                    item.image_data
-                                                        ? item.image_data
-                                                        : "https://blog.getmyparking.com/wp-content/uploads/2018/07/airport-parking-1.jpg"
-                                                }
-                                                className="img-fluid  w-100"
-                                                style={{
-                                                    height: "140px",
-                                                    objectFit: "contain",
-                                                    backgroundColor: "#fff" // optional, looks cleaner
-                                                }}
-
-                                                alt={item.product_name}
-                                                loading="lazy"
-                                            />
+                                             <img
+                                                                                                src={item.image_data || optionalLogo}
+                                                                                                className="card-logo"
+                                                                                            />
 
                                             <div className="mt-3"></div>
 
@@ -1478,6 +1480,7 @@ const ProductData = () => {
                                                                     dropDate: dropDateState,
                                                                     returnDate: returnDateState,
                                                                     airport: selectedAirport,
+                                                                    
                                                                 },
                                                             })
                                                         }
